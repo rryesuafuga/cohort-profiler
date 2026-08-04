@@ -1,0 +1,30 @@
+Package: cohortprofiler
+Title: Validate a REDCap Export and Render a Descriptive Analysis Report
+Version: 0.1.0
+Authors@R: person("VITAL-HMB study team", role = c("aut", "cre"),
+                  email = "noreply@example.org")
+Description: Takes a REDCap label export, validates it against a declarative
+    YAML spec, builds a tidy analysis frame, and renders a descriptive and
+    univariate analysis report to DOCX and PDF. Study knowledge lives entirely
+    in the spec, so the same code serves any cohort.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Depends:
+    R (>= 4.1)
+Imports:
+    dplyr,
+    flextable,
+    ggplot2,
+    gtsummary,
+    naniar,
+    readr,
+    rmarkdown,
+    stats,
+    utils,
+    yaml,
+    zip
+Suggests:
+    shiny,
+    testthat (>= 3.0.0)
+SystemRequirements: pandoc, libreoffice-writer (for DOCX to PDF conversion)
+RoxygenNote: 7.3.2

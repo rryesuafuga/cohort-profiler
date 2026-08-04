@@ -1,0 +1,4 @@
+# Hand-maintained: the package is small and loaded with load_all() during
+# development rather than being formally installed.
+exportPattern("^[^.]")
+S3method(print, cohort_validation)

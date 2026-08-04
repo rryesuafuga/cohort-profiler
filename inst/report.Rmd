@@ -1,0 +1,276 @@
+---
+title: "`r params$title_override`"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output:
+  word_document:
+    toc: true
+    toc_depth: 2
+params:
+  data_file: NULL
+  spec_file: NULL
+  r_dir: NULL
+  title_override: "Cohort Profile"
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE, message = FALSE, warning = FALSE,
+  fig.width = 6.5, fig.height = 4.2, dpi = 200
+)
+
+# The report is rendered in a fresh environment, so bring the analysis code in
+# explicitly rather than relying on anything being attached already.
+if (!is.null(params$r_dir)) {
+  for (f in list.files(params$r_dir, pattern = "\\.R$", full.names = TRUE)) {
+    source(f, local = TRUE)
+  }
+}
+
+spec <- read_spec(params$spec_file)
+raw  <- read_export(params$data_file)
+
+validation <- validate_export(raw, spec)
+stop_if_invalid(validation)
+
+analysis <- build_analysis_data(raw, spec, validation)
+quality  <- data_quality(analysis)
+
+y_name <- spec$outcome$name
+outcome_tab <- table(analysis[[y_name]])
+n_analytic  <- nrow(analysis)
+
+# Only domains that actually have data become sections.
+live_domains <- Filter(function(dm) length(domain_vars(analysis, spec, dm)) > 0,
+                       spec$domains)
+```
+
+```{r title-block, results = "asis"}
+cat("# Overview\n\n")
+```
+
+This report describes **`r n_analytic` participants** from the
+`r spec$study` study and tests each variable one at a time against the
+outcome, **`r spec$outcome$label`**.
+
+The upload contained `r validation$n_rows` rows. After keeping only
+`r spec$filter$event_value` records with an outcome result,
+`r n_analytic` participants remain.
+
+```{r overview-outcome}
+ov <- data.frame(
+  Group = names(outcome_tab),
+  N = as.integer(outcome_tab),
+  `%` = sprintf("%.1f%%", 100 * as.integer(outcome_tab) / n_analytic),
+  check.names = FALSE, stringsAsFactors = FALSE
+)
+style_table(flextable::flextable(ov), title = "Outcome distribution")
+```
+
+Every association below is **unadjusted**. Multivariable modelling is
+deliberately out of scope for this report.
+
+# Data quality
+
+```{r dq-intro, results = "asis"}
+issues <- c(
+  length(quality$soft),
+  if (!is.null(quality$out_of_range)) nrow(quality$out_of_range) else 0,
+  if (!is.null(quality$bad_levels)) nrow(quality$bad_levels) else 0,
+  if (!is.null(quality$high_missing)) nrow(quality$high_missing) else 0
+)
+if (sum(issues) == 0) {
+  cat("No data-quality problems were found. Every variable in the spec matched",
+      "a column, all values were inside their declared ranges, and every",
+      "response was one the spec declares.\n\n")
+} else {
+  cat("The export passed the checks needed to run the analysis. The points",
+      "below did not stop the report but are worth knowing about when reading",
+      "it.\n\n")
+}
+```
+
+```{r dq-soft, results = "asis"}
+if (length(quality$soft)) {
+  cat("## Columns the spec expected but did not find\n\n")
+  for (f in quality$soft) cat("- ", f$message, "\n", sep = "")
+  cat("\n")
+}
+```
+
+```{r dq-range, results = "asis"}
+ft <- range_flextable(quality)
+if (!is.null(ft)) {
+  cat("## Values outside the plausible range\n\n")
+  flextable::flextable_to_rmd(ft)
+  cat("\n")
+}
+```
+
+```{r dq-levels, results = "asis"}
+ft <- levels_flextable(quality)
+if (!is.null(ft)) {
+  cat("## Responses the spec does not declare\n\n")
+  cat("These were left as missing. They are never folded into an existing",
+      "category, because that would hide a change in how the question is",
+      "coded.\n\n")
+  flextable::flextable_to_rmd(ft)
+  cat("\n")
+}
+```
+
+```{r dq-highmiss, results = "asis"}
+hm <- quality$high_missing
+if (!is.null(hm) && nrow(hm)) {
+  cat("## Variables above the missingness threshold\n\n")
+  cat(sprintf("More than %.0f%% missing. Summaries for these are based on very few participants.\n\n",
+              100 * spec$options$missingness_threshold))
+  for (i in seq_len(nrow(hm))) {
+    cat(sprintf("- %s: %.1f%% missing\n", hm$label[i], hm$pct_missing[i]))
+  }
+  cat("\n")
+}
+```
+
+# Descriptive tables by outcome status
+
+```{r descriptives, results = "asis"}
+letters_seq <- letters[seq_along(live_domains)]
+for (i in seq_along(live_domains)) {
+  dm <- live_domains[[i]]
+  ft <- descriptive_flextable(
+    analysis, spec, dm,
+    title = sprintf("Table 1%s. %s by %s status", letters_seq[i], dm,
+                    outcome_positive_label(spec)))
+  if (is.null(ft)) next
+  cat("\n## ", dm, "\n\n", sep = "")
+  flextable::flextable_to_rmd(ft)
+  cat("\n")
+}
+```
+
+# Missingness
+
+## Per-variable missingness
+
+```{r missingness}
+missingness_flextable(quality, spec)
+```
+
+## Missingness mechanism
+
+```{r mcar, results = "asis"}
+mc <- mcar_result(analysis, spec)
+if (isTRUE(mc$ok)) {
+  cat(sprintf(
+    paste("Little's test for data missing completely at random was run over the",
+          "%d numeric variables below the %.0f%% missingness threshold.",
+          "The statistic is %.1f on %d degrees of freedom (p = %s), across %d",
+          "missingness patterns.\n\n"),
+    mc$n_vars, 100 * spec$options$missingness_threshold,
+    mc$statistic, mc$df, fmt_p(mc$p.value), mc$missing.patterns))
+  if (length(mc$dropped)) {
+    cat(sprintf(paste("%s %s left out of this test because %s an exact",
+                      "combination of other variables.\n\n"),
+                paste(mc$dropped, collapse = ", "),
+                if (length(mc$dropped) == 1) "was" else "were",
+                if (length(mc$dropped) == 1) "it is" else "they are"))
+  }
+  cat(if (!is.na(mc$p.value) && mc$p.value < 0.05) {
+    paste("A small p-value argues against missing completely at random, so",
+          "a complete-case analysis may be biased.\n\n")
+  } else {
+    paste("There is no strong evidence against missing completely at random",
+          "among these variables.\n\n")
+  })
+} else {
+  cat(mc$message, "\n\n")
+}
+```
+
+```{r missing-vs-outcome}
+mv <- missing_vs_outcome(analysis, spec)
+missing_vs_outcome_flextable(mv)
+```
+
+# Variable consistency checks
+
+```{r checks, results = "asis"}
+ft <- checks_flextable(quality)
+if (is.null(ft)) {
+  cat("The spec declares no consistency rules.\n\n")
+} else {
+  cat("Each rule below should hold for a plausible record. Records where the",
+      "rule cannot be evaluated, usually because one of the variables is",
+      "missing, are excluded from the denominator rather than counted as",
+      "passing.\n\n")
+  flextable::flextable_to_rmd(ft)
+  cat("\n")
+}
+```
+
+# Plots of key variables versus the outcome
+
+```{r plots, fig.height = 5.2}
+uni_all <- univariate_results(analysis, spec, live_domains)
+p <- outcome_plots(analysis, spec, uni_all)
+if (!is.null(p)) p
+```
+
+```{r plots-note, results = "asis"}
+if (is.null(p)) cat("No numeric variables were estimable, so there is nothing to plot.\n\n")
+```
+
+# Univariate logistic associations
+
+Each variable is entered on its own. Odds ratios are unadjusted, with Wald
+95% confidence intervals. A variable is reported as **not estimable** rather
+than given a number when it has fewer than
+`r spec$options$min_complete_cases` complete cases, has no variation, or
+separates the outcome perfectly — a separating variable would otherwise
+produce an enormous odds ratio that reads as a finding.
+
+```{r univariate, results = "asis"}
+for (dm in live_domains) {
+  res <- univariate_results(analysis, spec, dm)
+  ft <- univariate_flextable(
+    res, title = sprintf("Univariate associations: %s", dm))
+  if (is.null(ft)) next
+  cat("\n## ", dm, "\n\n", sep = "")
+  flextable::flextable_to_rmd(ft)
+  cat("\n")
+}
+```
+
+```{r nonestimable, results = "asis"}
+ne <- uni_all[nzchar(uni_all$note), , drop = FALSE]
+if (!is.null(ne) && nrow(ne)) {
+  cat("## Variables reported as not estimable\n\n")
+  for (i in seq_len(nrow(ne))) {
+    cat(sprintf("- **%s** — %s\n", ne$label[i], ne$note[i]))
+  }
+  cat("\n")
+}
+```
+
+# Notes and caveats
+
+- Every association in this report is **unadjusted**. No variable is
+  controlled for any other. Multivariable and penalised models are out of
+  scope here and live in a separate pipeline.
+- Continuous variables are summarised as median [IQR] and mean (SD) and
+  compared with the Wilcoxon rank-sum test, which does not assume normality.
+- Categorical variables are compared with Pearson's chi-square, falling back
+  to a simulated Fisher's exact test when any expected cell count is below
+  five.
+- Values outside the ranges declared in the spec were set to missing before
+  analysis. The count of such values is in the data-quality section.
+- Responses not declared in the spec were treated as missing rather than
+  grouped into an existing category.
+- p-values are not adjusted for multiple comparisons. With this many tests,
+  some results at p < 0.05 are expected by chance alone.
+
+```{r provenance, results = "asis"}
+cat(sprintf("\n---\n\nSource file: `%s`  \nSpec: `%s`  \nGenerated: %s\n",
+            basename(params$data_file), basename(params$spec_file),
+            format(Sys.time(), "%Y-%m-%d %H:%M")))
+```

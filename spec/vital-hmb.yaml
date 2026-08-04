@@ -1,0 +1,602 @@
+# ---------------------------------------------------------------------------
+# VITAL-HMB study spec
+#
+# Outcome: heavy menstrual bleeding (HMB) by alkaline hematin.
+#
+# This file is the single source of truth for every variable the report shows.
+# Adding a variable to the report means adding it here and nowhere else.
+#
+# `source` is matched against export column names: exact match first, then
+# unique substring. A substring that matches more than one column is an error.
+# ---------------------------------------------------------------------------
+
+study: VITAL-HMB
+title: Descriptive and Univariate Analysis
+
+record_id_column: Record ID
+
+outcome:
+  name: hmb
+  source: HMB calc
+  label: Heavy menstrual bleeding (alkaline hematin)
+  type: binary
+  # Keys are the values found in the export; order sets the reference level.
+  labels:
+    0: Non-HMB
+    1: HMB
+
+filter:
+  event_column: Event Name
+  event_value: Baseline
+  require_nonmissing: [HMB calc]
+
+# Values treated as missing wherever they appear. The REDCap export writes
+# these into otherwise-categorical columns; folding them into a factor level
+# would invent a category that no one answered.
+na_strings: ["", "Unknown", "Don't know", "Prefer not to say", "N/A", "NA", "."]
+
+options:
+  # A variable missing more than this fraction is flagged in data quality.
+  missingness_threshold: 0.60
+  # Univariate models below this many complete cases are non-estimable.
+  min_complete_cases: 30
+
+# Display order for the descriptive tables.
+domains:
+  - Demographics
+  - Social history
+  - Obstetrics & gynaecology
+  - Medical history
+  - Clinical measurements
+  - Ultrasound
+  - Laboratory
+  - Mental health & QoL
+
+variables:
+
+  # --- Demographics --------------------------------------------------------
+
+  - name: age
+    source: agecalc
+    domain: Demographics
+    label: Age (years)
+    type: numeric
+    range: [12, 45]
+    required: true
+
+  - name: region
+    source: B1. Which region
+    domain: Demographics
+    label: Region
+    type: factor
+    levels: [Central, Eastern, Northern, Western, Other]
+    required: true
+
+  - name: residence
+    source: B2. In what type of environment
+    domain: Demographics
+    label: Residence
+    type: factor
+    levels: [Rural, Semi-urban, Urban]
+    required: true
+
+  - name: marital
+    source: B3. What is your marital status
+    domain: Demographics
+    label: Marital status
+    type: factor
+    levels: [Ever-married, Single]
+    # Cell counts for the individual ever-married states are too small to
+    # report separately; the original collapsed them and so do we, explicitly.
+    recode:
+      Married: Ever-married
+      Separated: Ever-married
+      Divorced: Ever-married
+      Widowed: Ever-married
+    required: true
+
+  - name: in_school
+    source: B4. Are you currently in school
+    domain: Demographics
+    label: Currently in school
+    type: binary
+    levels: ["No", "Yes"]
+    required: true
+
+  - name: education
+    source: B5. What is your highest level of education
+    domain: Demographics
+    label: Education
+    type: factor
+    levels: [Secondary, Tertiary]
+    required: true
+
+  - name: religion
+    source: B6. What is your religious
+    domain: Demographics
+    label: Religion
+    type: factor
+    levels: [Anglican, Catholic, Muslim, Pentecostal, Other]
+    recode:
+      Moslem: Muslim
+    required: true
+
+  - name: ses_index
+    domain: Demographics
+    label: Socioeconomic status (PCA)
+    type: derived
+    fn: asset_pca
+    # Explicit column list, never a regex. The original matched asset columns
+    # by pattern, so adding a checkbox to the form silently redefined the index.
+    args:
+      positive: [Checked, Yes]
+      columns:
+        - Radio
+        - Television
+        - Bicycle
+        - Motor cycle
+        - Computer
+        - Tablet
+        - Business
+        - Bathroom
+        - Running water
+        - Electricity
+        - Solar
+        - Car
+        - Generator
+        - Mattress
+        - Bed with mattress
+        - Cupboard
+        - Truck
+        - Microwave
+        - Dining table
+        - Family home
+        - Smartphone
+
+  # --- Social history ------------------------------------------------------
+
+  - name: smoking
+    source: D1. Do you currently smoke
+    domain: Social history
+    label: Smoking
+    type: factor
+    levels: [Ever, Never]
+    recode:
+      Never smoked: Never
+      "Yes, occasionally": Ever
+      "Yes, daily": Ever
+    required: true
+
+  - name: alcohol
+    source: D9. Which of the following best describes
+    domain: Social history
+    label: Alcohol use
+    type: factor
+    levels: [Ever, Never]
+    recode:
+      Never drink alcohol: Never
+      Drink occasionally: Ever
+      Drink weekly: Ever
+      Drink daily: Ever
+    required: true
+
+  - name: water_source
+    source: B11. What is the main source of drinking water
+    domain: Social history
+    label: Drinking water source
+    type: factor
+    levels: [Borehole, Piped water, Other]
+    recode:
+      Protected spring: Other
+      Surface water: Other
+      Unprotected spring: Other
+      Rain water: Other
+    required: true
+
+  - name: cooking_fuel
+    source: B16. What is the main source of energy
+    domain: Social history
+    label: Cooking fuel
+    type: factor
+    levels: [Charcoal, Fire wood, Other]
+    recode:
+      Gas: Other
+      Electricity for cooking: Other
+      Paraffin: Other
+    required: true
+
+  - name: financial
+    source: B9. How well would you say you are managing
+    domain: Social history
+    label: Financial difficulty (0-4)
+    # Ordinal: reported as a score, ascending in difficulty.
+    type: ordinal
+    levels:
+      - Living comfortably
+      - Doing alright
+      - Just getting by
+      - Finding it quite difficult
+      - Finding it very difficult
+    scores:
+      Living comfortably: 0
+      Doing alright: 1
+      Just getting by: 2
+      Finding it quite difficult: 3
+      Finding it very difficult: 4
+    required: true
+
+  # --- Obstetrics & gynaecology --------------------------------------------
+
+  - name: age_menarche
+    source: E1. At what age did you start
+    domain: Obstetrics & gynaecology
+    label: Age at menarche
+    type: numeric
+    range: [8, 20]
+    required: true
+
+  - name: cycle_length
+    source: E3. How long was your previous menstrual cycle
+    domain: Obstetrics & gynaecology
+    label: Cycle length (days)
+    type: numeric
+    range: [15, 60]
+    required: true
+
+  - name: regular
+    source: E4. During the last 6 months, did you have menstrual periods every month
+    domain: Obstetrics & gynaecology
+    label: Regular monthly periods
+    type: binary
+    levels: ["No", "Yes"]
+    required: true
+
+  - name: bleeding_days
+    source: E6. During the last 6 months, on average, how many days did you spend actively bleeding
+    domain: Obstetrics & gynaecology
+    label: Active bleeding days/cycle
+    type: numeric
+    range: [1, 30]
+    required: true
+
+  - name: intermens
+    source: E7. During the last 6 months, how many days do you experience on average in between
+    domain: Obstetrics & gynaecology
+    label: Days between periods
+    type: numeric
+    range: [10, 90]
+
+  - name: longest_cycle
+    source: E8. During the last 6 months, what was the longest
+    domain: Obstetrics & gynaecology
+    label: Longest bleeding (days)
+    type: numeric
+    range: [10, 90]
+
+  - name: shortest_cycle
+    source: E9. During the last 6 months, what was the shortest
+    domain: Obstetrics & gynaecology
+    label: Shortest bleeding (days)
+    type: numeric
+    range: [5, 60]
+
+  - name: imb
+    source: E10.In the past 6 months, have you experienced bleeding
+    domain: Obstetrics & gynaecology
+    label: Intermenstrual spotting
+    type: binary
+    levels: ["No", "Yes"]
+
+  - name: self_vol
+    source: E11. During the last 6 months, how would you characterize
+    domain: Obstetrics & gynaecology
+    label: Self-reported volume
+    type: factor
+    levels: [Light, Normal, Heavy]
+    required: true
+
+  - name: gravidity
+    source: E19. How many times have you been pregnant
+    domain: Obstetrics & gynaecology
+    label: Number of pregnancies
+    type: numeric
+    range: [0, 15]
+
+  - name: ever_pregnant
+    source: H10. Have you ever been pregnant
+    domain: Obstetrics & gynaecology
+    label: Ever pregnant
+    type: binary
+    levels: ["No", "Yes"]
+
+  - name: pelvic_pain
+    source: I42. If you experience pelvic
+    domain: Obstetrics & gynaecology
+    label: Pelvic pain severity (0-10)
+    type: numeric
+    range: [0, 10]
+
+  # --- Medical history -----------------------------------------------------
+
+  - name: chronic_illness
+    source: C2. Do you currently have any chronic
+    domain: Medical history
+    label: Chronic illness
+    type: binary
+    levels: ["No", "Yes"]
+    required: true
+
+  - name: recent_malaria
+    source: C3. Malaria
+    domain: Medical history
+    label: Recent malaria
+    type: binary
+    levels: ["No", "Yes"]
+
+  - name: recent_uti
+    source: C7. Urinary Tract Infection
+    domain: Medical history
+    label: Recent UTI
+    type: binary
+    levels: ["No", "Yes"]
+
+  - name: peptic_ulcer
+    source: C9. Peptic Ulcer
+    domain: Medical history
+    label: Peptic ulcer
+    type: binary
+    levels: ["No", "Yes"]
+
+  - name: iron_supplements
+    source: C15. Have you taken any iron supplements or multi-vitamins
+    domain: Medical history
+    label: Iron or multivitamin supplements
+    type: binary
+    levels: ["No", "Yes"]
+
+  - name: treated_anaemia
+    source: H4. Have you ever been treated for anemia
+    domain: Medical history
+    label: Treated for anaemia
+    type: binary
+    levels: ["No", "Yes"]
+
+  - name: family_bleeding
+    source: H5. Has anyone in your family ever been diagnosed with a bleeding
+    domain: Medical history
+    label: Family bleeding disorder
+    type: binary
+    levels: ["No", "Yes"]
+
+  - name: dental_bleed
+    source: H6. Have you ever had a tooth extracted
+    domain: Medical history
+    label: Bleeding after dental work
+    type: binary
+    levels: ["No", "Yes"]
+
+  - name: other_surgery
+    source: H8. Have you ever had surgery other than dental
+    domain: Medical history
+    label: Bleeding after surgery
+    type: binary
+    levels: ["No", "Yes"]
+
+  - name: easy_bruising
+    source: H12. Do you have a history of easy bruising
+    domain: Medical history
+    label: Easy bruising/nosebleeds
+    type: binary
+    levels: ["No", "Yes"]
+
+  - name: sought_care
+    source: I36. Have you sought health care for menstrual
+    domain: Medical history
+    label: Sought care for periods
+    type: binary
+    levels: ["No", "Yes"]
+
+  # --- Clinical measurements -----------------------------------------------
+
+  - name: bmi
+    source: F6. BMI is
+    domain: Clinical measurements
+    label: Body mass index
+    type: numeric
+    range: [12, 60]
+    required: true
+
+  - name: weight_kg
+    source: "Average Weight:"
+    domain: Clinical measurements
+    label: Weight (kg)
+    type: numeric
+    range: [25, 150]
+    required: true
+
+  - name: height_cm
+    source: "Average Height:"
+    domain: Clinical measurements
+    label: Height (cm)
+    type: numeric
+    range: [120, 200]
+    required: true
+
+  - name: sbp
+    source: Average - Systolic BP
+    domain: Clinical measurements
+    label: Systolic BP (mmHg)
+    type: numeric
+    range: [70, 220]
+    required: true
+
+  - name: dbp
+    source: Average - Diastolic BP
+    domain: Clinical measurements
+    label: Diastolic BP (mmHg)
+    type: numeric
+    range: [40, 140]
+    required: true
+
+  - name: map
+    domain: Clinical measurements
+    label: Mean arterial pressure
+    type: derived
+    expr: (sbp + 2 * dbp) / 3
+    range: [40, 160]
+
+  - name: heart_rate
+    source: "Average Heart Rate:"
+    domain: Clinical measurements
+    label: Heart rate (bpm)
+    type: numeric
+    range: [40, 160]
+    required: true
+
+  - name: temperature
+    # The export header carries a Latin-1 degree sign; match on the ASCII part
+    # so the spec itself stays plain ASCII.
+    source: Average Temperature
+    domain: Clinical measurements
+    label: Temperature (C)
+    type: numeric
+    range: [34, 42]
+
+  # --- Ultrasound ----------------------------------------------------------
+
+  - name: endo_thickness
+    source: S13. Endometrial thickness
+    domain: Ultrasound
+    label: Endometrial thickness (mm)
+    type: numeric
+    range: [0, 40]
+
+  - name: uterus_position
+    source: S2. Position of the uterus
+    domain: Ultrasound
+    label: Uterine position
+    type: factor
+    levels: [Anteverted, Retroverted, Others]
+
+  - name: myo_texture
+    source: S5. What is the myometrial echo texture
+    domain: Ultrasound
+    label: Myometrial echo texture
+    type: factor
+    levels: [Homogenous, Heterogenous, Others]
+
+  - name: endo_pattern
+    source: S15. Endometrial echo pattern
+    domain: Ultrasound
+    label: Endometrial echo pattern
+    type: factor
+    levels: [Uniform, Bright edge, Non-uniform]
+
+  # --- Laboratory ----------------------------------------------------------
+
+  - name: haemoglobin
+    source: HGB
+    domain: Laboratory
+    label: Haemoglobin (g/dL)
+    type: numeric
+    range: [3, 20]
+
+  - name: serum_ferritin
+    source: Serum Ferritin
+    domain: Laboratory
+    label: Serum ferritin (ng/mL)
+    type: numeric
+    range: [0, 500]
+
+  - name: serum_iron
+    source: Serum Iron
+    domain: Laboratory
+    label: Serum iron (ug/dL)
+    type: numeric
+    range: [0, 400]
+
+  # --- Mental health & QoL -------------------------------------------------
+  #
+  # Item blocks are matched by pattern, but `n_items` is asserted: if the form
+  # gains or loses an item the build fails rather than quietly rescaling.
+
+  - name: phq9_depression
+    domain: Mental health & QoL
+    label: Depression severity (PHQ-9)
+    type: derived
+    fn: item_mean
+    args:
+      pattern: "^L\\d+\\."
+      n_items: 9
+      min_answered: 5
+      scores:
+        Not at all: 0
+        Several days: 1
+        More than half the days: 2
+        Nearly every day: 3
+
+  - name: gad7_anxiety
+    domain: Mental health & QoL
+    label: Anxiety severity (GAD-7)
+    type: derived
+    fn: item_mean
+    args:
+      pattern: "^M\\d+\\."
+      n_items: 7
+      min_answered: 4
+      scores:
+        Not at all: 0
+        Several days: 1
+        More than half the days: 2
+        Nearly every day: 3
+
+  - name: pms_score
+    domain: Mental health & QoL
+    label: Premenstrual symptom score
+    type: derived
+    fn: item_mean
+    args:
+      pattern: "^J\\d+\\."
+      n_items: 8
+      min_answered: 4
+      scores:
+        Not at all: 0
+        Mild: 1
+        Moderate: 2
+        Severe: 3
+
+  - name: qol_score
+    domain: Mental health & QoL
+    label: Menstrual QoL burden
+    type: derived
+    fn: item_mean
+    args:
+      pattern: "^K\\d+\\."
+      n_items: 6
+      min_answered: 3
+      scores:
+        Never: 0
+        Once or twice: 1
+        A few times: 2
+        In most periods: 3
+        In every period: 4
+
+# ---------------------------------------------------------------------------
+# Consistency rules. Each `expr` must evaluate to TRUE for a plausible record.
+# Rows where the expression is NA are not evaluable and are excluded from the
+# denominator rather than counted as passes.
+# ---------------------------------------------------------------------------
+
+checks:
+  - name: Age at menarche < current age
+    expr: age_menarche < age
+  - name: Longest bleeding >= shortest bleeding
+    expr: longest_cycle >= shortest_cycle
+  - name: Active bleeding days <= cycle length
+    expr: bleeding_days <= cycle_length
+  - name: Systolic BP >= diastolic BP
+    expr: sbp >= dbp
+  - name: BMI within 12-60
+    expr: bmi >= 12 & bmi <= 60
+  - name: Heart rate within 40-160
+    expr: heart_rate >= 40 & heart_rate <= 160

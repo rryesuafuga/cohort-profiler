@@ -1,0 +1,24 @@
+# Participant data must never reach this repo. The only CSV allowed is the
+# synthetic fixture under data-raw/.
+*.csv
+!data-raw/*.csv
+
+# Rendered reports are build output, and a rendered report contains data.
+*.docx
+*.pdf
+!docs/**/*.pdf
+
+# R
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+*.Rproj
+
+# renv keeps the lockfile, never the library
+renv/library/
+renv/local/
+renv/staging/
+renv/python/
+
+.DS_Store
