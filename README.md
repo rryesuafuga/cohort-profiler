@@ -137,10 +137,48 @@ Carried over from the original report; they were deliberate choices.
 Every association is unadjusted. Multivariable and LASSO modelling are out of
 scope here and live in a separate Python pipeline.
 
-## Deploying to Spaces
+## Deploying
+
+The container is platform-agnostic: it listens on 7860 by default and honors a
+platform-injected `PORT` variable. Every push to `main` re-verifies the image
+in CI (build, boot, and a full in-image render to DOCX and PDF).
+
+### Google Cloud Run
+
+Runs the same image with scale-to-zero pricing. From [Cloud
+Shell](https://shell.cloud.google.com) in a project with billing enabled:
+
+```bash
+git clone https://github.com/rryesuafuga/cohort-profiler
+cd cohort-profiler
+gcloud run deploy cohort-profiler \
+  --source . \
+  --region europe-west1 \
+  --memory 2Gi --cpu 1 --timeout 3600 \
+  --min-instances 0 --max-instances 1 \
+  --session-affinity \
+  --no-allow-unauthenticated
+```
+
+Notes:
+
+- `--no-allow-unauthenticated` keeps the URL closed. Grant the study team
+  access by enabling Identity-Aware Proxy on the service and adding their
+  Google accounts — do not make a tool that accepts participant records
+  public.
+- `--session-affinity` matters: Shiny holds a websocket per session.
+- `--memory 2Gi` covers a render (R plus LibreOffice); the 512 MB default
+  does not.
+- The first request after idle pays a cold start (roughly 30-60 s for an
+  image this size) on top of the 20-40 s render.
+- For continuous deployment, use the service's "Set up continuous
+  deployment" button in the console and point it at this repo's `main`.
+
+### Hugging Face Spaces
 
 The frontmatter at the top of this file is the Space's configuration; Spaces
-reads it from the README rather than a separate file. Two things to know:
+reads it from the README rather than a separate file. Docker Spaces require a
+paid plan. Two things to know:
 
 - **Set the Space to private from the start.** Spaces are public by default,
   which is not appropriate for a tool that accepts participant records.

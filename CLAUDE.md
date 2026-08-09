@@ -27,7 +27,9 @@ to discover late.
 
 3. **Port 7860, host 0.0.0.0.** Hugging Face Spaces requires this. Run the app
    directly (`shiny::runApp(host = "0.0.0.0", port = 7860)`); do not install or
-   configure shiny-server.
+   configure shiny-server. The container honors a platform-injected `PORT`
+   environment variable (Cloud Run sets one); 7860 stays the default when it
+   is absent.
 
 4. **The container must set a UTF-8 locale.** Put
    `ENV LANG=C.UTF-8 LC_ALL=C.UTF-8` in the Dockerfile. The export is ISO-8859-1

@@ -1,0 +1,13 @@
+# Kept out of the build context and therefore out of the deployed image.
+#
+# The original report HTML carries the real cohort's aggregate tables; there
+# is no reason for it to ship inside a container that handles uploads.
+# data-raw/ MUST stay in: the CI render check runs against the fixture from
+# inside the image.
+.git
+.github
+VITAL_HMB_Descriptive_Analysis.html
+*.docx
+*.pdf
+.Rhistory
+.Rproj.user

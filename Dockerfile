@@ -60,7 +60,9 @@ RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 ENV HOME=/home/appuser
 
-# Spaces requires the app on 7860, bound to all interfaces. Run Shiny directly;
-# there is no shiny-server in this image's role.
+# The app listens on 7860 bound to all interfaces (the Hugging Face Spaces
+# contract). Platforms that choose the port for you — Cloud Run injects PORT —
+# are honored when the variable is present; 7860 stays the default everywhere
+# else. Run Shiny directly; there is no shiny-server in this image's role.
 EXPOSE 7860
-CMD ["R", "-q", "-e", "shiny::runApp('/app', host = '0.0.0.0', port = 7860)"]
+CMD ["R", "-q", "-e", "shiny::runApp('/app', host = '0.0.0.0', port = as.integer(Sys.getenv('PORT', '7860')))"]
