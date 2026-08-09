@@ -18,8 +18,18 @@ ENV LANG=C.UTF-8 \
 # libreoffice-writer converts the rendered DOCX to PDF. libreoffice-core alone
 # is not enough: without the Writer filters, soffice reports only "source file
 # could not be loaded" for every input.
+#
+# The lib* lines are the runtime libraries the 2026 package binaries link
+# against, enumerated with readelf over every compiled package in renv.lock.
+# The base image predates some of them — fs needs libuv, V8 links Ubuntu's
+# libnode — and a missing one fails the build with "unable to load shared
+# object". Most of the rest are already in the image; listing them anyway is
+# a no-op today and insurance against a slimmer base tomorrow.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libreoffice-writer \
+        libcairo2 libcurl4 libfontconfig1 libfreetype6 libfribidi0 \
+        libharfbuzz0b libjpeg-turbo8 libnode72 libpng16-16 libssl3 \
+        libtiff5 libuv1 libwebp7 libwebpmux3 libxml2 zlib1g \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
