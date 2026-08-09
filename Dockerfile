@@ -28,12 +28,17 @@ WORKDIR /app
 # package layer. Restoring into the system library keeps the later COPY from
 # clobbering a project library.
 #
-# renv would otherwise restore from the repository recorded in the lockfile,
-# which is source-only CRAN. Overriding it with the image's own repo keeps the
-# binary packages.
+# The image's own CRAN mirror is frozen at the date R 4.3.3 was current
+# (2024), but renv.lock records 2026 package versions, so restoring from the
+# image's repo fails outright ("failed to retrieve package"). Point renv at a
+# Posit Package Manager snapshot dated to match the lockfile instead: it
+# serves Ubuntu jammy binaries built for R 4.3, so installs stay fast, and
+# the couple of lockfile versions CRAN superseded that same week resolve from
+# the snapshot's archive. All 107 locked versions were verified retrievable
+# from this snapshot before it was pinned here.
+ENV RENV_CONFIG_REPOS_OVERRIDE=https://packagemanager.posit.co/cran/__linux__/jammy/2026-08-05
 COPY renv.lock /app/renv.lock
-RUN R -q -e "install.packages('renv'); \
-             options(renv.config.repos.override = getOption('repos')); \
+RUN R -q -e "install.packages('renv', repos = Sys.getenv('RENV_CONFIG_REPOS_OVERRIDE')); \
              renv::restore(lockfile = '/app/renv.lock', \
                            library = .libPaths()[1], prompt = FALSE)"
 
