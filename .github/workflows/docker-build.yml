@@ -1,0 +1,53 @@
+# Builds the Docker image and smoke-tests it: the app must boot and serve on
+# port 7860, and the full pipeline must render the fixture to DOCX and PDF
+# inside the image. This is effectively what Hugging Face Spaces does on every
+# push, so a green run here means the Space build should succeed too.
+name: docker-build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: docker-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-smoke-test:
+    runs-on: ubuntu-latest
+    # The image is heavy (rocker base + libreoffice-writer + 107 pinned R
+    # packages); the first build can take a while even with binary packages.
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the image
+        run: docker build -t cohort-profiler:ci .
+
+      - name: Boot the app and confirm it serves on 7860
+        run: |
+          docker run -d -p 7860:7860 --name app cohort-profiler:ci
+          ok=0
+          for i in $(seq 1 60); do
+            if curl -sf -o page.html http://127.0.0.1:7860/; then ok=1; break; fi
+            sleep 2
+          done
+          test "$ok" = 1
+          grep -q "Cohort Profiler" page.html
+
+      - name: Render the fixture to DOCX and PDF inside the image
+        run: >
+          docker run --rm
+          -v "$PWD/.github/scripts:/ci:ro"
+          cohort-profiler:ci
+          Rscript /ci/render-check.R
+
+      - name: App logs
+        if: always()
+        run: docker logs app 2>&1 || true
+
+      - name: Clean up
+        if: always()
+        run: docker rm -f app 2>/dev/null || true
