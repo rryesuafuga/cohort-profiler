@@ -33,6 +33,21 @@ if (!length(rsconnect::accounts()$name)) {
        call. = FALSE)
 }
 
+# Packages installed from Posit Package Manager carry "Repository: RSPM" in
+# their DESCRIPTION. The deploy manifest resolves that name against
+# options("repos"); when no repo named RSPM exists there, the bare name leaks
+# into the manifest and the shinyapps build dies fetching any package missing
+# from its cache ("Unsupported url scheme: RSPM/src/contrib/..."). Give both
+# conventional names real URLs so every package in the manifest resolves.
+repos <- getOption("repos")
+if (!"RSPM" %in% names(repos)) {
+  repos <- c(repos, RSPM = "https://packagemanager.posit.co/cran/latest")
+}
+if (!"CRAN" %in% names(repos) || identical(unname(repos["CRAN"]), "@CRAN@")) {
+  repos["CRAN"] <- "https://cloud.r-project.org"
+}
+options(repos = repos)
+
 # .rscignore trims the bundle; what remains is exactly what the server needs.
 rsconnect::deployApp(
   appDir = ".",
