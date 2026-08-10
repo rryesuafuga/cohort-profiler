@@ -5,6 +5,7 @@
 .git
 .github
 .dockerignore
+.Rbuildignore
 CLAUDE.md
 DESCRIPTION
 Dockerfile
@@ -16,4 +17,5 @@ data-raw
 deploy
 renv.lock
 run_report.R
+run_report_standalone.R
 tests

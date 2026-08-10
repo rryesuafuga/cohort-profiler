@@ -36,6 +36,15 @@ jobs:
         with:
           extra-packages: any::rsconnect
 
+      # rsconnect reads renv.lock from the project directory to pin versions
+      # even when the lockfile is excluded from the bundle -- and fails,
+      # because the lockfile records build-time packages (cpp11 and friends)
+      # that the runner never installs. Removing it here (runner only, the
+      # repo keeps it) makes rsconnect pin the versions actually installed
+      # above instead.
+      - name: Keep rsconnect away from renv.lock
+        run: rm -f renv.lock
+
       - name: Deploy to shinyapps.io
         env:
           SHINYAPPS_ACCOUNT: dnfxdz-raymond-wayesu
