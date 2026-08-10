@@ -77,7 +77,7 @@ if (!dir.exists(file.path(code_dir, "R"))) {
   utils::unzip(zipfile, exdir = tempdir())
   extracted <- list.dirs(tempdir(), recursive = FALSE)
   extracted <- extracted[grepl("cohort-profiler-", basename(extracted))]
-  file.rename(extracted[[1]], code_dir)
+  invisible(file.rename(extracted[[1]], code_dir))
 }
 for (f in list.files(file.path(code_dir, "R"), pattern = "\\.R$",
                      full.names = TRUE)) {
