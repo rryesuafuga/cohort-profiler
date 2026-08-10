@@ -32,9 +32,15 @@ jobs:
       # rsconnect pins the package versions installed here into the bundle
       # manifest, so the server installs what the deploy machine had — which
       # is why the runner needs the full dependency set from DESCRIPTION.
+      # cpp11 and progress are build-time helpers that the runtime dependency
+      # tree does not install, but rsconnect's snapshot validation requires
+      # them to be present locally before it will produce a manifest.
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          extra-packages: any::rsconnect
+          extra-packages: |
+            any::rsconnect
+            any::cpp11
+            any::progress
 
       # rsconnect reads renv.lock from the project directory to pin versions
       # even when the lockfile is excluded from the bundle -- and fails,
