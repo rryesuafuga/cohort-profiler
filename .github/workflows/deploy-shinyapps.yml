@@ -32,15 +32,28 @@ jobs:
       # rsconnect pins the package versions installed here into the bundle
       # manifest, so the server installs what the deploy machine had — which
       # is why the runner needs the full dependency set from DESCRIPTION.
-      # cpp11 and progress are build-time helpers that the runtime dependency
-      # tree does not install, but rsconnect's snapshot validation requires
-      # them to be present locally before it will produce a manifest.
-      - uses: r-lib/actions/setup-r-dependencies@v2
-        with:
-          extra-packages: |
-            any::rsconnect
-            any::cpp11
-            any::progress
+      # Plain install.packages, deliberately not pak: pak stamps Remote*
+      # metadata into each installed DESCRIPTION, and with that present the
+      # deploy manifest recorded the literal repository name "RSPM" instead
+      # of a URL, which broke the shinyapps build fetching any package not in
+      # its cache. This installation path was verified to produce a manifest
+      # where every package resolves to a real URL. cpp11 and progress are
+      # build-time helpers rsconnect's snapshot validation insists on.
+      - name: Install app dependencies
+        run: |
+          Rscript -e '
+            options(Ncpus = 4)
+            install.packages(c(
+              "dplyr", "flextable", "ggplot2", "gtsummary", "naniar",
+              "readr", "rmarkdown", "yaml", "zip", "shiny", "knitr",
+              "rsconnect", "cpp11", "progress"))
+            need <- c("rsconnect", "shiny", "gtsummary", "flextable",
+                      "progress", "cpp11")
+            miss <- need[!vapply(need, requireNamespace, logical(1),
+                                 quietly = TRUE)]
+            if (length(miss)) stop("failed to install: ",
+                                   paste(miss, collapse = ", "))
+          '
 
       # rsconnect reads renv.lock from the project directory to pin versions
       # even when the lockfile is excluded from the bundle -- and fails,
