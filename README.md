@@ -169,7 +169,15 @@ has no LibreOffice, so the app detects that and offers **Word output only**;
 and below the paid tiers the URL is **public — anyone with the link can open
 the app**. The free tier meters 25 active hours per month.
 
-Deploy from an R session on your machine, from the repo root:
+Two ways to deploy:
+
+**From GitHub, no local R.** Add two repository secrets (Settings → Secrets
+and variables → Actions): `SHINYAPPS_TOKEN` and `SHINYAPPS_SECRET`, both from
+the shinyapps.io dashboard under Account → Tokens → Show. Then Actions →
+**deploy-shinyapps** → Run workflow. Deploys are manual on purpose — each one
+restarts the live app.
+
+**From an R session on your machine**, from the repo root:
 
 ```r
 install.packages("rsconnect")                 # once
