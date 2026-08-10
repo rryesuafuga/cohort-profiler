@@ -137,11 +137,42 @@ Carried over from the original report; they were deliberate choices.
 Every association is unadjusted. Multivariable and LASSO modelling are out of
 scope here and live in a separate Python pipeline.
 
+## Running it without a server: the standalone script
+
+`run_report.R` is a single file you can share with anyone who has R. It
+fetches the analysis code from this repository, installs any missing
+packages, and renders a report from their REDCap export on their own
+machine — DOCX always, plus PDF when LibreOffice is installed. Their data
+never leaves their computer.
+
+```bash
+Rscript run_report.R path/to/redcap_export.csv
+# or open it in RStudio, click Source, and pick the file in the dialog
+```
+
 ## Deploying
 
 The container is platform-agnostic: it listens on 7860 by default and honors a
 platform-injected `PORT` variable. Every push to `main` re-verifies the image
 in CI (build, boot, and a full in-image render to DOCX and PDF).
+
+### shinyapps.io (free tier, DOCX only, public URL)
+
+The only zero-cost hosted option, with two accepted trade-offs: shinyapps.io
+has no LibreOffice, so the app detects that and offers **Word output only**;
+and below the paid tiers the URL is **public — anyone with the link can open
+the app**. The free tier meters 25 active hours per month.
+
+Deploy from an R session on your machine, from the repo root:
+
+```r
+install.packages("rsconnect")                 # once
+# paste your setAccountInfo(...) line from the shinyapps.io dashboard, then:
+source("deploy/deploy-shinyapps.R")
+```
+
+`.rscignore` keeps the bundle to exactly what the server needs — in
+particular the original report HTML and the fixture stay out of it.
 
 ### Google Cloud Run
 

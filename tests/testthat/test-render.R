@@ -65,6 +65,28 @@ test_that("a failing export aborts the render with the human-readable list", {
   expect_false(file.exists(file.path(out_dir, "should-not-exist.docx")))
 })
 
+test_that("LibreOffice discovery reports honestly in both directions", {
+  skip_if_not(nzchar(Sys.which("soffice")), "soffice not on PATH here")
+  expect_true(soffice_available())
+  expect_true(file.exists(find_soffice()))
+
+  # With PATH emptied, discovery falls back to the standard install locations,
+  # none of which exist on this machine — so it must say no, not guess.
+  withr::local_envvar(PATH = "")
+  expect_false(soffice_available())
+})
+
+test_that("a DOCX-only render neither produces nor promises a PDF", {
+  skip_if_not(nzchar(Sys.which("pandoc")), "pandoc is not installed")
+  out_dir <- withr::local_tempdir()
+  out <- render_report(clean_fixture_csv(), vital_spec_path(),
+                       out_dir = out_dir, basename_out = "docx-only",
+                       formats = "docx")
+  expect_true(file.exists(out$docx))
+  expect_null(out$pdf)
+  expect_length(list.files(out_dir, pattern = "\\.pdf$"), 0L)
+})
+
 test_that("outputs can be bundled into a zip", {
   out_dir <- withr::local_tempdir()
   a <- file.path(out_dir, "a.docx"); writeLines("a", a)

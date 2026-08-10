@@ -1,0 +1,19 @@
+# Kept out of the shinyapps.io bundle. The app needs app.R, R/, inst/ and
+# spec/ -- nothing else. DESCRIPTION and NAMESPACE stay out so rsconnect and
+# shiny treat this as an app, not a half-installed package, and the original
+# report HTML (real cohort aggregates) never leaves the repo.
+.git
+.github
+.dockerignore
+CLAUDE.md
+DESCRIPTION
+Dockerfile
+LICENSE
+NAMESPACE
+README.md
+VITAL_HMB_Descriptive_Analysis.html
+data-raw
+deploy
+renv.lock
+run_report.R
+tests

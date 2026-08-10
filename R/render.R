@@ -8,7 +8,18 @@
 # ---------------------------------------------------------------------------
 
 #' Root of the installed app, whether running from source or from a package.
+#'
+#' The standalone runner executes from wherever the user's data lives, with
+#' the code in a temp directory — walking up from getwd() cannot find it. It
+#' announces the code's location via the `cohortprofiler.home` option (or the
+#' COHORT_PROFILER_HOME environment variable), which wins when set.
 app_root <- function() {
+  override <- getOption("cohortprofiler.home",
+                        Sys.getenv("COHORT_PROFILER_HOME", ""))
+  if (nzchar(override) &&
+      file.exists(file.path(override, "inst", "report.Rmd"))) {
+    return(override)
+  }
   p <- system.file(package = "cohortprofiler")
   if (nzchar(p) && file.exists(file.path(p, "report.Rmd"))) return(p)
   # Running from a source checkout: this file lives in <root>/R.
@@ -39,6 +50,42 @@ r_source_dir <- function() {
   if (length(hit)) hit[[1]] else NULL
 }
 
+#' Locate the LibreOffice binary, wherever the platform hides it.
+#'
+#' PATH lookup alone is not enough: on Windows LibreOffice installs to
+#' Program Files without touching PATH, and on macOS it lives inside the
+#' application bundle. A collaborator with LibreOffice installed should not
+#' be told it is missing.
+#'
+#' @return Full path to soffice, or "" when it cannot be found.
+find_soffice <- function() {
+  hit <- Sys.which("soffice")
+  if (nzchar(hit)) return(unname(hit))
+  hit <- Sys.which("libreoffice")
+  if (nzchar(hit)) return(unname(hit))
+
+  candidates <- c(
+    file.path(Sys.getenv("ProgramFiles", "C:/Program Files"),
+              "LibreOffice", "program", "soffice.exe"),
+    file.path(Sys.getenv("ProgramFiles(x86)", "C:/Program Files (x86)"),
+              "LibreOffice", "program", "soffice.exe"),
+    "/Applications/LibreOffice.app/Contents/MacOS/soffice",
+    "/usr/local/bin/soffice",
+    "/opt/homebrew/bin/soffice",
+    "/snap/bin/libreoffice"
+  )
+  hit <- candidates[file.exists(candidates)]
+  if (length(hit)) hit[[1]] else ""
+}
+
+#' Is a PDF conversion possible on this machine?
+#'
+#' When it is not — shinyapps.io has no LibreOffice and no way to install
+#' one — the report degrades to DOCX only. It must never fall back to a
+#' LaTeX render: the PDF is defined as a conversion of the DOCX, and a
+#' second rendering path would let the two disagree.
+soffice_available <- function() nzchar(find_soffice())
+
 #' Convert a DOCX to PDF with headless LibreOffice.
 #'
 #' LibreOffice needs a writable profile directory. In a container the default
@@ -47,10 +94,11 @@ r_source_dir <- function() {
 #'
 #' @return Path to the PDF.
 docx_to_pdf <- function(docx, out_dir = dirname(docx), timeout = 180) {
-  soffice <- Sys.which("soffice")
-  if (!nzchar(soffice)) soffice <- Sys.which("libreoffice")
+  soffice <- find_soffice()
   if (!nzchar(soffice)) {
-    stop("LibreOffice was not found, so the PDF cannot be produced. Install libreoffice-writer.",
+    stop(paste("LibreOffice was not found, so the PDF cannot be produced.",
+               "Install it free from libreoffice.org (the Word file is",
+               "unaffected)."),
          call. = FALSE)
   }
   profile <- file.path(tempdir(), "lo_profile")
@@ -143,6 +191,9 @@ render_report <- function(data_file,
   if (!file.exists(docx)) {
     stop("The report did not produce a Word file.", call. = FALSE)
   }
+  # The knitted copy of the template is plumbing, not a deliverable; leaving
+  # it next to the outputs only confuses whoever opens the folder.
+  unlink(rmd)
 
   out <- list(docx = docx)
   if ("pdf" %in% formats) {
