@@ -137,17 +137,23 @@ Carried over from the original report; they were deliberate choices.
 Every association is unadjusted. Multivariable and LASSO modelling are out of
 scope here and live in a separate Python pipeline.
 
-## Running it without a server: the standalone script
+## Running it without a server: the shareable scripts
 
-`run_report.R` is a single file you can share with anyone who has R. It
-fetches the analysis code from this repository, installs any missing
-packages, and renders a report from their REDCap export on their own
-machine — DOCX always, plus PDF when LibreOffice is installed. Their data
-never leaves their computer.
+Two single-file runners, same usage, different trade-off. Both install any
+missing packages on first run, render on the collaborator's own machine
+(DOCX always, PDF when LibreOffice is installed), and never send data
+anywhere.
+
+- **`run_report.R`** — thin: downloads the analysis code from this
+  repository at run time, so it always runs the current `main`.
+- **`run_report_standalone.R`** — the whole analysis embedded, nothing
+  fetched: results cannot change under the collaborator, and it works even
+  if this repository moves or goes private. It is a snapshot; regenerate it
+  after code changes with `Rscript deploy/make_standalone.R`.
 
 ```bash
 Rscript run_report.R path/to/redcap_export.csv
-# or open it in RStudio, click Source, and pick the file in the dialog
+# or open either file in RStudio, click Source, and pick the file in a dialog
 ```
 
 ## Deploying
