@@ -18,6 +18,12 @@ knitr::opts_chunk$set(
   fig.width = 6.5, fig.height = 4.2, dpi = 200
 )
 
+# The report renders once per output format, and Fisher's exact test uses
+# simulated p-values. Without a fixed seed the DOCX and HTML versions would
+# carry slightly different numbers — exactly the disagreement between
+# formats this project promises cannot happen.
+set.seed(20260630)
+
 # The report is rendered in a fresh environment, so bring the analysis code in
 # explicitly rather than relying on anything being attached already.
 if (!is.null(params$r_dir)) {

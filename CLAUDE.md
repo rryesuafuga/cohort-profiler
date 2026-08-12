@@ -24,8 +24,11 @@ to discover late.
    `soffice --headless --convert-to pdf --outdir <dir> <docx>`.
    Do not install TinyTeX, and do not add a `pdf_document` output format. The PDF
    must be a conversion of the DOCX so the two always agree. Where LibreOffice
-   cannot exist (shinyapps.io), the app degrades to DOCX-only — gate on
-   `soffice_available()`, never substitute a LaTeX render.
+   cannot exist (shinyapps.io), the app drops the PDF — gate on
+   `soffice_available()`, never substitute a LaTeX render. The HTML version is
+   a second render of the same Rmd (flextable emits real HTML tables); the
+   report sets a fixed seed so simulated p-values are identical across
+   formats — do not remove it.
 
 3. **Port 7860, host 0.0.0.0.** Hugging Face Spaces requires this. Run the app
    directly (`shiny::runApp(host = "0.0.0.0", port = 7860)`); do not install or
@@ -207,9 +210,9 @@ exercises the whole path.
   button reads as a crash.
 - Uploads: cap at ~50 MB, accept `.csv` only, and read with
   `readr::locale(encoding = "ISO-8859-1")` — REDCap label exports are Latin-1.
-- Offer DOCX and PDF as separate download buttons, plus a combined zip. When
-  `soffice_available()` is FALSE (shinyapps.io), show the DOCX button only and
-  say why.
+- Offer DOCX, HTML and PDF as separate download buttons, plus a combined zip.
+  When `soffice_available()` is FALSE (shinyapps.io), hide the PDF button and
+  say why; DOCX and HTML remain.
 - Delete uploads and rendered files at session end
   (`session$onSessionEnded`). Participant data must not persist in the container.
 

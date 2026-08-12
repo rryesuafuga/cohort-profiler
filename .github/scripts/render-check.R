@@ -25,8 +25,13 @@ stopifnot(
   "PDF missing"      = file.exists(out$pdf),
   "PDF trivially small"  = file.size(out$pdf) > 20000,
   "PDF is not a real PDF" =
-    identical(readBin(out$pdf, "raw", 4L), charToRaw("%PDF"))
+    identical(readBin(out$pdf, "raw", 4L), charToRaw("%PDF")),
+  "HTML missing"     = file.exists(out$html),
+  "HTML trivially small" = file.size(out$html) > 50000,
+  "HTML is not a real page" =
+    grepl("<!DOCTYPE html", readChar(out$html, 200), ignore.case = TRUE)
 )
 
-cat(sprintf("render OK: docx %.0f KB, pdf %.0f KB\n",
-            file.size(out$docx) / 1024, file.size(out$pdf) / 1024))
+cat(sprintf("render OK: docx %.0f KB, pdf %.0f KB, html %.0f KB\n",
+            file.size(out$docx) / 1024, file.size(out$pdf) / 1024,
+            file.size(out$html) / 1024))

@@ -11,7 +11,7 @@ pinned: false
 # cohort-profiler
 
 Upload a REDCap export, get a descriptive and univariate analysis report back
-as Word and PDF.
+as Word, HTML and PDF.
 
 The app validates the export against a declarative spec before it analyses
 anything. Study knowledge — variable names, source columns, labels, valid
@@ -116,6 +116,12 @@ soffice --headless --convert-to pdf --outdir <dir> <docx>
 One rendering path, so the two files cannot disagree. There is no LaTeX in this
 pipeline, which is also why every table goes through `flextable` rather than
 `gt`.
+
+The HTML version is a second render of the same template — flextable emits
+real HTML tables — into a single self-contained file. The report fixes a
+random seed so the simulated Fisher p-values are identical in every format
+(verified cell-by-cell: all 125 p-values in the fixture report match between
+DOCX and HTML).
 
 ## Statistical conventions
 

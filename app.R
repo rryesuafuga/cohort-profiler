@@ -61,7 +61,7 @@ ui <- fluidPage(
       actionButton("run", "Check and build report", class = "btn-primary"),
       tags$hr(),
       if (!PDF_AVAILABLE) p(class = "muted",
-        "This deployment produces Word (.docx) only. The PDF needs",
+        "This deployment produces Word (.docx) and HTML. The PDF needs",
         "LibreOffice, which is available in the Docker version."),
       uiOutput("downloads"),
       tags$hr(),
@@ -143,7 +143,8 @@ server <- function(input, output, session) {
             spec_file = spec_file,
             out_dir   = file.path(tempdir(), paste0("report-", session$token)),
             basename_out = tools::file_path_sans_ext(input$upload$name),
-            formats   = if (PDF_AVAILABLE) c("docx", "pdf") else "docx",
+            formats   = if (PDF_AVAILABLE) c("docx", "pdf", "html")
+                        else c("docx", "html"),
             progress = function(frac, msg) setProgress(value = frac, detail = msg)
           ),
           error = function(e) e)
@@ -210,17 +211,17 @@ server <- function(input, output, session) {
     if (is.null(r)) {
       return(p(class = "muted", "Downloads appear here once a report is built."))
     }
-    if (PDF_AVAILABLE) {
-      tagList(
-        downloadButton("dl_docx", "Word (.docx)", class = "btn-block"),
-        tags$br(),
+    tagList(
+      downloadButton("dl_docx", "Word (.docx)", class = "btn-block"),
+      tags$br(),
+      if (PDF_AVAILABLE) tagList(
         downloadButton("dl_pdf", "PDF", class = "btn-block"),
-        tags$br(),
-        downloadButton("dl_zip", "Both (.zip)", class = "btn-block")
-      )
-    } else {
-      downloadButton("dl_docx", "Word (.docx)", class = "btn-block")
-    }
+        tags$br()
+      ),
+      downloadButton("dl_html", "Web page (.html)", class = "btn-block"),
+      tags$br(),
+      downloadButton("dl_zip", "All formats (.zip)", class = "btn-block")
+    )
   })
 
   dl_name <- function(ext) {
@@ -238,6 +239,14 @@ server <- function(input, output, session) {
     content = function(file) {
       req(results()$paths$pdf)
       file.copy(results()$paths$pdf, file)
+    }
+  )
+
+  output$dl_html <- downloadHandler(
+    filename = function() dl_name("html"),
+    content = function(file) {
+      req(results()$paths$html)
+      file.copy(results()$paths$html, file)
     }
   )
 

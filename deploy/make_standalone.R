@@ -40,11 +40,13 @@ w(sprintf(r"---(#!/usr/bin/env Rscript
 #
 # The entire analysis -- validation, data build, tables, report template and
 # the VITAL-HMB spec -- is embedded below. Nothing is downloaded at run time.
-# Still needed on the machine, because no R script can contain them:
+# Output: a Word file (.docx) and a web page (.html) always, plus a PDF when
+# LibreOffice is present. Still needed on the machine, because no R script
+# can contain them:
 #   * R 4.1+ and, on first run, internet to install missing CRAN packages
 #   * pandoc (bundled with RStudio; plain-R users are pointed to an installer)
-#   * LibreOffice for the PDF (optional and free; without it you still get
-#     the Word file, which Word itself can export to PDF via File > Save As)
+#   * LibreOffice for the PDF (optional and free; without it Word itself can
+#     export the .docx to PDF via File > Save As)
 #
 # How to run
 #   In RStudio:  open this file, click Source, pick your CSV when asked.
@@ -120,8 +122,8 @@ spec_file <- file.path(code_dir, "spec", "vital-hmb.yaml")
 message("Analysis code: OK (embedded)")
 
 pdf_ok <- soffice_available()
-message(if (pdf_ok) "LibreOffice: OK -- you will get DOCX and PDF"
-        else paste("LibreOffice: not found -- you will get the Word file only.",
+message(if (pdf_ok) "LibreOffice: OK -- you will get DOCX, HTML and PDF"
+        else paste("LibreOffice: not found -- you will get DOCX and HTML.",
                    "For a PDF too, install it free from https://libreoffice.org",
                    "and run this again (or open the Word file and Save As PDF)."))
 
@@ -152,7 +154,7 @@ result <- tryCatch(
     out_dir = out_dir,
     basename_out = paste0(tools::file_path_sans_ext(basename(data_file)),
                           "-report"),
-    formats = if (pdf_ok) c("docx", "pdf") else "docx"
+    formats = if (pdf_ok) c("docx", "pdf", "html") else c("docx", "html")
   ),
   error = function(e) e
 )

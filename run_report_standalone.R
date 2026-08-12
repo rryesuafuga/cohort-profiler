@@ -3,16 +3,18 @@
 # run_report_standalone.R -- cohort-profiler report, single self-contained file
 #
 # GENERATED from https://github.com/rryesuafuga/cohort-profiler
-# at commit 20edfeb on 2026-08-10 by deploy/make_standalone.R. Do not edit by
+# at commit c19a94c on 2026-08-12 by deploy/make_standalone.R. Do not edit by
 # hand; regenerate instead.
 #
 # The entire analysis -- validation, data build, tables, report template and
 # the VITAL-HMB spec -- is embedded below. Nothing is downloaded at run time.
-# Still needed on the machine, because no R script can contain them:
+# Output: a Word file (.docx) and a web page (.html) always, plus a PDF when
+# LibreOffice is present. Still needed on the machine, because no R script
+# can contain them:
 #   * R 4.1+ and, on first run, internet to install missing CRAN packages
 #   * pandoc (bundled with RStudio; plain-R users are pointed to an installer)
-#   * LibreOffice for the PDF (optional and free; without it you still get
-#     the Word file, which Word itself can export to PDF via File > Save As)
+#   * LibreOffice for the PDF (optional and free; without it Word itself can
+#     export the .docx to PDF via File > Save As)
 #
 # How to run
 #   In RStudio:  open this file, click Source, pick your CSV when asked.
@@ -21,7 +23,7 @@
 # Your data never leaves your machine.
 # ---------------------------------------------------------------------------
 
-message("cohort-profiler standalone report (embedded code, commit 20edfeb)")
+message("cohort-profiler standalone report (embedded code, commit c19a94c)")
 message("-------------------------------------------------------------")
 
 if (getRversion() < "4.1") {
@@ -225,7 +227,7 @@ c("# ---------------------------------------------------------------------------
 "derive_registry <- function() {", "  list(item_mean = item_mean, asset_pca = asset_pca)", 
 "}")
 
-# ==== R/render.R (216 lines) ====
+# ==== R/render.R (249 lines) ====
 .embedded[["R/render.R"]] <-
 c("# ---------------------------------------------------------------------------", 
 "# Rendering.", "#", "# One render, then convert. The report is knitted to DOCX with pandoc, and the", 
@@ -293,17 +295,20 @@ c("# ---------------------------------------------------------------------------
 "  if (!file.exists(pdf)) {", "    stop(sprintf(\"Converting the report to PDF failed.\\n%s\",", 
 "                 paste(res, collapse = \"\\n\")), call. = FALSE)", 
 "  }", "  pdf", "}", "", "#' Render the report for one export.", 
-"#'", "#' @param data_file Path to the REDCap CSV export.", "#' @param spec_file Path to the study spec YAML.", 
-"#' @param out_dir Where to write the outputs. Defaults to a fresh temp dir,", 
+"#'", "#' The DOCX is the canonical output and is always rendered. The PDF is only", 
+"#' ever a LibreOffice conversion of that DOCX. The HTML version is a second", 
+"#' render of the same template — flextable emits real HTML tables — and a", 
+"#' fixed seed inside the report keeps its simulated p-values identical to", 
+"#' the DOCX's, so the formats cannot disagree.", "#'", "#' @param data_file Path to the REDCap CSV export.", 
+"#' @param spec_file Path to the study spec YAML.", "#' @param out_dir Where to write the outputs. Defaults to a fresh temp dir,", 
 "#'   because the app directory is not reliably writable in a container.", 
 "#' @param basename_out Base name for the output files, without extension.", 
-"#' @param formats Which outputs to produce: \"docx\", \"pdf\", or both.", 
-"#' @param progress Optional function taking (fraction, message) for UI updates.", 
+"#' @param formats Any of \"docx\", \"pdf\", \"html\".", "#' @param progress Optional function taking (fraction, message) for UI updates.", 
 "#' @return A named list of file paths.", "render_report <- function(data_file,", 
 "                          spec_file,", "                          out_dir = NULL,", 
 "                          basename_out = \"cohort-report\",", 
-"                          formats = c(\"docx\", \"pdf\"),", 
-"                          progress = NULL) {", "  formats <- match.arg(formats, c(\"docx\", \"pdf\"), several.ok = TRUE)", 
+"                          formats = c(\"docx\", \"pdf\", \"html\"),", 
+"                          progress = NULL) {", "  formats <- match.arg(formats, c(\"docx\", \"pdf\", \"html\"), several.ok = TRUE)", 
 "", "  # Resolve every input path before rendering: rmarkdown::render() changes the", 
 "  # working directory, after which a relative path no longer means what it did.", 
 "  data_file <- normalizePath(data_file, mustWork = TRUE)", "  spec_file <- normalizePath(spec_file, mustWork = TRUE)", 
@@ -328,12 +333,21 @@ c("# ---------------------------------------------------------------------------
 "      r_dir          = r_dir,", "      title_override = title", 
 "    ),", "    envir = new.env(parent = globalenv()),", "    quiet = TRUE", 
 "  )", "  if (!file.exists(docx)) {", "    stop(\"The report did not produce a Word file.\", call. = FALSE)", 
-"  }", "  # The knitted copy of the template is plumbing, not a deliverable; leaving", 
+"  }", "", "  out <- list(docx = docx)", "", "  if (\"html\" %in% formats) {", 
+"    say(0.65, \"Rendering the web version\")", "    html <- file.path(out_dir, paste0(basename_out, \".html\"))", 
+"    rmarkdown::render(", "      input = rmd,", "      output_format = rmarkdown::html_document(toc = TRUE, toc_depth = 2),", 
+"      output_file = basename(html),", "      output_dir = out_dir,", 
+"      intermediates_dir = out_dir,", "      knit_root_dir = out_dir,", 
+"      params = list(", "        data_file      = data_file,", 
+"        spec_file      = spec_file,", "        r_dir          = r_dir,", 
+"        title_override = title", "      ),", "      envir = new.env(parent = globalenv()),", 
+"      quiet = TRUE", "    )", "    if (!file.exists(html)) {", 
+"      stop(\"The report did not produce an HTML file.\", call. = FALSE)", 
+"    }", "    out$html <- html", "  }", "", "  # The knitted copy of the template is plumbing, not a deliverable; leaving", 
 "  # it next to the outputs only confuses whoever opens the folder.", 
-"  unlink(rmd)", "", "  out <- list(docx = docx)", "  if (\"pdf\" %in% formats) {", 
-"    say(0.85, \"Converting to PDF\")", "    out$pdf <- docx_to_pdf(docx, out_dir)", 
-"  }", "  if (!\"docx\" %in% formats) out$docx <- NULL", "", 
-"  say(1, \"Done\")", "  out", "}", "", "#' Bundle rendered outputs into a zip.", 
+"  unlink(rmd)", "", "  if (\"pdf\" %in% formats) {", "    say(0.85, \"Converting to PDF\")", 
+"    out$pdf <- docx_to_pdf(docx, out_dir)", "  }", "  if (!\"docx\" %in% formats) out$docx <- NULL", 
+"", "  say(1, \"Done\")", "  out", "}", "", "#' Bundle rendered outputs into a zip.", 
 "zip_outputs <- function(paths, zipfile) {", "  paths <- unlist(paths, use.names = FALSE)", 
 "  paths <- paths[!is.na(paths) & file.exists(paths)]", "  if (!length(paths)) stop(\"Nothing to zip.\", call. = FALSE)", 
 "  zip::zip(zipfile, files = basename(paths), root = dirname(paths[[1]]))", 
@@ -983,14 +997,18 @@ c("# ---------------------------------------------------------------------------
 "  - name: Heart rate within 40-160", "    expr: heart_rate >= 40 & heart_rate <= 160"
 )
 
-# ==== inst/report.Rmd (276 lines) ====
+# ==== inst/report.Rmd (282 lines) ====
 .embedded[["inst/report.Rmd"]] <-
 c("---", "title: \"`r params$title_override`\"", "date: \"`r format(Sys.Date(), '%d %B %Y')`\"", 
 "output:", "  word_document:", "    toc: true", "    toc_depth: 2", 
 "params:", "  data_file: NULL", "  spec_file: NULL", "  r_dir: NULL", 
 "  title_override: \"Cohort Profile\"", "---", "", "```{r setup, include = FALSE}", 
 "knitr::opts_chunk$set(", "  echo = FALSE, message = FALSE, warning = FALSE,", 
-"  fig.width = 6.5, fig.height = 4.2, dpi = 200", ")", "", "# The report is rendered in a fresh environment, so bring the analysis code in", 
+"  fig.width = 6.5, fig.height = 4.2, dpi = 200", ")", "", "# The report renders once per output format, and Fisher's exact test uses", 
+"# simulated p-values. Without a fixed seed the DOCX and HTML versions would", 
+"# carry slightly different numbers — exactly the disagreement between", 
+"# formats this project promises cannot happen.", "set.seed(20260630)", 
+"", "# The report is rendered in a fresh environment, so bring the analysis code in", 
 "# explicitly rather than relying on anything being attached already.", 
 "if (!is.null(params$r_dir)) {", "  for (f in list.files(params$r_dir, pattern = \"\\\\.R$\", full.names = TRUE)) {", 
 "    source(f, local = TRUE)", "  }", "}", "", "spec <- read_spec(params$spec_file)", 
@@ -1122,8 +1140,8 @@ spec_file <- file.path(code_dir, "spec", "vital-hmb.yaml")
 message("Analysis code: OK (embedded)")
 
 pdf_ok <- soffice_available()
-message(if (pdf_ok) "LibreOffice: OK -- you will get DOCX and PDF"
-        else paste("LibreOffice: not found -- you will get the Word file only.",
+message(if (pdf_ok) "LibreOffice: OK -- you will get DOCX, HTML and PDF"
+        else paste("LibreOffice: not found -- you will get DOCX and HTML.",
                    "For a PDF too, install it free from https://libreoffice.org",
                    "and run this again (or open the Word file and Save As PDF)."))
 
@@ -1154,7 +1172,7 @@ result <- tryCatch(
     out_dir = out_dir,
     basename_out = paste0(tools::file_path_sans_ext(basename(data_file)),
                           "-report"),
-    formats = if (pdf_ok) c("docx", "pdf") else "docx"
+    formats = if (pdf_ok) c("docx", "pdf", "html") else c("docx", "html")
   ),
   error = function(e) e
 )

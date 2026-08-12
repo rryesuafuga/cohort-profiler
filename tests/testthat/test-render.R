@@ -20,10 +20,12 @@ test_that("the fixture renders end to end to DOCX and PDF", {
 
   expect_true(file.exists(out$docx))
   expect_true(file.exists(out$pdf))
+  expect_true(file.exists(out$html))
 
   # A DOCX that renders but contains nothing still opens fine, so assert size.
   expect_gt(file.size(out$docx), 20000)
   expect_gt(file.size(out$pdf), 20000)
+  expect_gt(file.size(out$html), 50000)
 
   # The PDF must really be a PDF, not a renamed failure.
   expect_identical(readBin(out$pdf, "raw", 4L), charToRaw("%PDF"))
@@ -31,6 +33,14 @@ test_that("the fixture renders end to end to DOCX and PDF", {
   # The DOCX must be a real Word package.
   entries <- utils::unzip(out$docx, list = TRUE)$Name
   expect_true("word/document.xml" %in% entries)
+
+  # The HTML must be a real, self-contained page: correct doctype, real
+  # tables in it, and no side-car _files directory (a single file is the
+  # whole deliverable).
+  expect_match(readChar(out$html, 200), "<!DOCTYPE html", ignore.case = TRUE)
+  html_text <- paste(readLines(out$html, warn = FALSE), collapse = "\n")
+  expect_gt(lengths(regmatches(html_text, gregexpr("<table", html_text))), 5)
+  expect_length(list.dirs(out_dir, recursive = FALSE), 0L)
 
   expect_true(length(steps) > 0)
 })
@@ -76,7 +86,7 @@ test_that("LibreOffice discovery reports honestly in both directions", {
   expect_false(soffice_available())
 })
 
-test_that("a DOCX-only render neither produces nor promises a PDF", {
+test_that("a DOCX-only render neither produces nor promises a PDF or HTML", {
   skip_if_not(nzchar(Sys.which("pandoc")), "pandoc is not installed")
   out_dir <- withr::local_tempdir()
   out <- render_report(clean_fixture_csv(), vital_spec_path(),
@@ -84,7 +94,19 @@ test_that("a DOCX-only render neither produces nor promises a PDF", {
                        formats = "docx")
   expect_true(file.exists(out$docx))
   expect_null(out$pdf)
-  expect_length(list.files(out_dir, pattern = "\\.pdf$"), 0L)
+  expect_null(out$html)
+  expect_length(list.files(out_dir, pattern = "\\.(pdf|html)$"), 0L)
+})
+
+test_that("the shinyapps combination renders DOCX and HTML without a PDF", {
+  skip_if_not(nzchar(Sys.which("pandoc")), "pandoc is not installed")
+  out_dir <- withr::local_tempdir()
+  out <- render_report(clean_fixture_csv(), vital_spec_path(),
+                       out_dir = out_dir, basename_out = "no-soffice",
+                       formats = c("docx", "html"))
+  expect_true(file.exists(out$docx))
+  expect_true(file.exists(out$html))
+  expect_null(out$pdf)
 })
 
 test_that("outputs can be bundled into a zip", {

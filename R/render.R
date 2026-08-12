@@ -127,21 +127,27 @@ docx_to_pdf <- function(docx, out_dir = dirname(docx), timeout = 180) {
 
 #' Render the report for one export.
 #'
+#' The DOCX is the canonical output and is always rendered. The PDF is only
+#' ever a LibreOffice conversion of that DOCX. The HTML version is a second
+#' render of the same template — flextable emits real HTML tables — and a
+#' fixed seed inside the report keeps its simulated p-values identical to
+#' the DOCX's, so the formats cannot disagree.
+#'
 #' @param data_file Path to the REDCap CSV export.
 #' @param spec_file Path to the study spec YAML.
 #' @param out_dir Where to write the outputs. Defaults to a fresh temp dir,
 #'   because the app directory is not reliably writable in a container.
 #' @param basename_out Base name for the output files, without extension.
-#' @param formats Which outputs to produce: "docx", "pdf", or both.
+#' @param formats Any of "docx", "pdf", "html".
 #' @param progress Optional function taking (fraction, message) for UI updates.
 #' @return A named list of file paths.
 render_report <- function(data_file,
                           spec_file,
                           out_dir = NULL,
                           basename_out = "cohort-report",
-                          formats = c("docx", "pdf"),
+                          formats = c("docx", "pdf", "html"),
                           progress = NULL) {
-  formats <- match.arg(formats, c("docx", "pdf"), several.ok = TRUE)
+  formats <- match.arg(formats, c("docx", "pdf", "html"), several.ok = TRUE)
 
   # Resolve every input path before rendering: rmarkdown::render() changes the
   # working directory, after which a relative path no longer means what it did.
@@ -191,11 +197,38 @@ render_report <- function(data_file,
   if (!file.exists(docx)) {
     stop("The report did not produce a Word file.", call. = FALSE)
   }
+
+  out <- list(docx = docx)
+
+  if ("html" %in% formats) {
+    say(0.65, "Rendering the web version")
+    html <- file.path(out_dir, paste0(basename_out, ".html"))
+    rmarkdown::render(
+      input = rmd,
+      output_format = rmarkdown::html_document(toc = TRUE, toc_depth = 2),
+      output_file = basename(html),
+      output_dir = out_dir,
+      intermediates_dir = out_dir,
+      knit_root_dir = out_dir,
+      params = list(
+        data_file      = data_file,
+        spec_file      = spec_file,
+        r_dir          = r_dir,
+        title_override = title
+      ),
+      envir = new.env(parent = globalenv()),
+      quiet = TRUE
+    )
+    if (!file.exists(html)) {
+      stop("The report did not produce an HTML file.", call. = FALSE)
+    }
+    out$html <- html
+  }
+
   # The knitted copy of the template is plumbing, not a deliverable; leaving
   # it next to the outputs only confuses whoever opens the folder.
   unlink(rmd)
 
-  out <- list(docx = docx)
   if ("pdf" %in% formats) {
     say(0.85, "Converting to PDF")
     out$pdf <- docx_to_pdf(docx, out_dir)
