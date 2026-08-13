@@ -222,7 +222,8 @@ exercises the whole path.
 
 Preserve the original report's choices; they were deliberate.
 
-- Continuous: median [IQR] and mean (SD), Wilcoxon rank-sum p-value.
+- Continuous: median [IQR] and mean (SD) to 1 decimal, Wilcoxon rank-sum
+  p-value.
 - Categorical: n (%) to 1 decimal, chi-square, falling back to Fisher
   (`simulate.p.value = TRUE`) when any expected cell < 5.
 - Univariate logistic per variable, OR with Wald 95% CI.

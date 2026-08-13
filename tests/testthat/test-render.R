@@ -34,6 +34,26 @@ test_that("the fixture renders end to end to DOCX and PDF", {
   entries <- utils::unzip(out$docx, list = TRUE)$Name
   expect_true("word/document.xml" %in% entries)
 
+  # Publication-quality guarantees: every table grid fits the 6.5 in text
+  # column (9360 twips) so Word never clips an edge, and the settings carry
+  # the flags that refresh the TOC on open and keep Word out of
+  # Compatibility Mode.
+  tmp <- withr::local_tempdir()
+  utils::unzip(out$docx, exdir = tmp)
+  doc <- paste(readLines(file.path(tmp, "word", "document.xml"),
+                         warn = FALSE, encoding = "UTF-8"), collapse = "")
+  tbls <- regmatches(doc, gregexpr("<w:tbl[ >].*?</w:tbl>", doc))[[1]]
+  grid_widths <- vapply(tbls, function(t) {
+    sum(as.integer(regmatches(t,
+      gregexpr('(?<=<w:gridCol w:w=")\\d+', t, perl = TRUE))[[1]]))
+  }, numeric(1))
+  expect_gt(length(grid_widths), 10)
+  expect_lte(max(grid_widths), 9360)
+  settings <- paste(readLines(file.path(tmp, "word", "settings.xml"),
+                              warn = FALSE, encoding = "UTF-8"), collapse = "")
+  expect_match(settings, 'updateFields w:val="true"', fixed = TRUE)
+  expect_match(settings, 'compatibilityMode', fixed = TRUE)
+
   # The HTML must be a real, self-contained page: correct doctype, real
   # tables in it, and no side-car _files directory (a single file is the
   # whole deliverable).

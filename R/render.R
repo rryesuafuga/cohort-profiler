@@ -86,6 +86,53 @@ find_soffice <- function() {
 #' second rendering path would let the two disagree.
 soffice_available <- function() nzchar(find_soffice())
 
+#' Post-process a pandoc DOCX so Word treats it as a finished document.
+#'
+#' Two flags live in word/settings.xml, and pandoc sets neither:
+#' `updateFields` makes Word refresh the table of contents on open (otherwise
+#' every entry shows the stale page number "1"), and a `compatibilityMode` of
+#' 15 marks the file as current-generation, so Word does not open it in
+#' Compatibility Mode. The patched file is re-zipped in place; LibreOffice
+#' consuming it afterwards for the PDF doubles as a validity check.
+polish_docx <- function(docx) {
+  tmp <- file.path(tempdir(), paste0("docx-polish-", basename(docx)))
+  unlink(tmp, recursive = TRUE)
+  dir.create(tmp, recursive = TRUE)
+  utils::unzip(docx, exdir = tmp)
+
+  settings <- file.path(tmp, "word", "settings.xml")
+  if (!file.exists(settings)) return(invisible(docx))
+  x <- paste(readLines(settings, warn = FALSE, encoding = "UTF-8"),
+             collapse = "\n")
+
+  if (!grepl("<w:updateFields", x, fixed = TRUE)) {
+    x <- sub("(<w:settings[^>]*>)",
+             '\\1<w:updateFields w:val="true"/>', x)
+  }
+  compat <- paste0(
+    '<w:compat><w:compatSetting w:name="compatibilityMode" ',
+    'w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat>')
+  if (grepl('w:name="compatibilityMode"', x, fixed = TRUE)) {
+    x <- gsub('(w:name="compatibilityMode"[^>]*w:val=")[0-9]+', "\\115", x)
+  } else if (grepl("<m:mathPr", x, fixed = TRUE)) {
+    x <- sub("<m:mathPr", paste0(compat, "<m:mathPr"), x)
+  } else {
+    x <- sub("</w:settings>", paste0(compat, "</w:settings>"), x)
+  }
+  writeLines(x, settings, useBytes = TRUE)
+
+  # mirror mode preserves the relative paths under root; cherry-pick would
+  # flatten word/document.xml to document.xml and corrupt the package.
+  rezipped <- paste0(docx, ".tmp")
+  unlink(rezipped)
+  zip::zip(zipfile = rezipped,
+           files = list.files(tmp, all.files = TRUE, no.. = TRUE),
+           root = tmp, mode = "mirror")
+  file.copy(rezipped, docx, overwrite = TRUE)
+  unlink(rezipped)
+  invisible(docx)
+}
+
 #' Convert a DOCX to PDF with headless LibreOffice.
 #'
 #' LibreOffice needs a writable profile directory. In a container the default
@@ -197,6 +244,7 @@ render_report <- function(data_file,
   if (!file.exists(docx)) {
     stop("The report did not produce a Word file.", call. = FALSE)
   }
+  polish_docx(docx)
 
   out <- list(docx = docx)
 

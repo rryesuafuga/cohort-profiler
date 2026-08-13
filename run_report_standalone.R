@@ -3,7 +3,7 @@
 # run_report_standalone.R -- cohort-profiler report, single self-contained file
 #
 # GENERATED from https://github.com/rryesuafuga/cohort-profiler
-# at commit c19a94c on 2026-08-12 by deploy/make_standalone.R. Do not edit by
+# at commit 832f121 on 2026-08-13 by deploy/make_standalone.R. Do not edit by
 # hand; regenerate instead.
 #
 # The entire analysis -- validation, data build, tables, report template and
@@ -23,7 +23,7 @@
 # Your data never leaves your machine.
 # ---------------------------------------------------------------------------
 
-message("cohort-profiler standalone report (embedded code, commit c19a94c)")
+message("cohort-profiler standalone report (embedded code, commit 832f121)")
 message("-------------------------------------------------------------")
 
 if (getRversion() < "4.1") {
@@ -227,7 +227,7 @@ c("# ---------------------------------------------------------------------------
 "derive_registry <- function() {", "  list(item_mean = item_mean, asset_pca = asset_pca)", 
 "}")
 
-# ==== R/render.R (249 lines) ====
+# ==== R/render.R (297 lines) ====
 .embedded[["R/render.R"]] <-
 c("# ---------------------------------------------------------------------------", 
 "# Rendering.", "#", "# One render, then convert. The report is knitted to DOCX with pandoc, and the", 
@@ -273,8 +273,32 @@ c("# ---------------------------------------------------------------------------
 "#' one — the report degrades to DOCX only. It must never fall back to a", 
 "#' LaTeX render: the PDF is defined as a conversion of the DOCX, and a", 
 "#' second rendering path would let the two disagree.", "soffice_available <- function() nzchar(find_soffice())", 
-"", "#' Convert a DOCX to PDF with headless LibreOffice.", "#'", 
-"#' LibreOffice needs a writable profile directory. In a container the default", 
+"", "#' Post-process a pandoc DOCX so Word treats it as a finished document.", 
+"#'", "#' Two flags live in word/settings.xml, and pandoc sets neither:", 
+"#' `updateFields` makes Word refresh the table of contents on open (otherwise", 
+"#' every entry shows the stale page number \"1\"), and a `compatibilityMode` of", 
+"#' 15 marks the file as current-generation, so Word does not open it in", 
+"#' Compatibility Mode. The patched file is re-zipped in place; LibreOffice", 
+"#' consuming it afterwards for the PDF doubles as a validity check.", 
+"polish_docx <- function(docx) {", "  tmp <- file.path(tempdir(), paste0(\"docx-polish-\", basename(docx)))", 
+"  unlink(tmp, recursive = TRUE)", "  dir.create(tmp, recursive = TRUE)", 
+"  utils::unzip(docx, exdir = tmp)", "", "  settings <- file.path(tmp, \"word\", \"settings.xml\")", 
+"  if (!file.exists(settings)) return(invisible(docx))", "  x <- paste(readLines(settings, warn = FALSE, encoding = \"UTF-8\"),", 
+"             collapse = \"\\n\")", "", "  if (!grepl(\"<w:updateFields\", x, fixed = TRUE)) {", 
+"    x <- sub(\"(<w:settings[^>]*>)\",", "             '\\\\1<w:updateFields w:val=\"true\"/>', x)", 
+"  }", "  compat <- paste0(", "    '<w:compat><w:compatSetting w:name=\"compatibilityMode\" ',", 
+"    'w:uri=\"http://schemas.microsoft.com/office/word\" w:val=\"15\"/></w:compat>')", 
+"  if (grepl('w:name=\"compatibilityMode\"', x, fixed = TRUE)) {", 
+"    x <- gsub('(w:name=\"compatibilityMode\"[^>]*w:val=\")[0-9]+', \"\\\\115\", x)", 
+"  } else if (grepl(\"<m:mathPr\", x, fixed = TRUE)) {", "    x <- sub(\"<m:mathPr\", paste0(compat, \"<m:mathPr\"), x)", 
+"  } else {", "    x <- sub(\"</w:settings>\", paste0(compat, \"</w:settings>\"), x)", 
+"  }", "  writeLines(x, settings, useBytes = TRUE)", "", "  # mirror mode preserves the relative paths under root; cherry-pick would", 
+"  # flatten word/document.xml to document.xml and corrupt the package.", 
+"  rezipped <- paste0(docx, \".tmp\")", "  unlink(rezipped)", 
+"  zip::zip(zipfile = rezipped,", "           files = list.files(tmp, all.files = TRUE, no.. = TRUE),", 
+"           root = tmp, mode = \"mirror\")", "  file.copy(rezipped, docx, overwrite = TRUE)", 
+"  unlink(rezipped)", "  invisible(docx)", "}", "", "#' Convert a DOCX to PDF with headless LibreOffice.", 
+"#'", "#' LibreOffice needs a writable profile directory. In a container the default", 
 "#' location under $HOME may not be writable, and the failure surfaces as an", 
 "#' empty error, so the profile is pointed at a temporary directory explicitly.", 
 "#'", "#' @return Path to the PDF.", "docx_to_pdf <- function(docx, out_dir = dirname(docx), timeout = 180) {", 
@@ -333,8 +357,9 @@ c("# ---------------------------------------------------------------------------
 "      r_dir          = r_dir,", "      title_override = title", 
 "    ),", "    envir = new.env(parent = globalenv()),", "    quiet = TRUE", 
 "  )", "  if (!file.exists(docx)) {", "    stop(\"The report did not produce a Word file.\", call. = FALSE)", 
-"  }", "", "  out <- list(docx = docx)", "", "  if (\"html\" %in% formats) {", 
-"    say(0.65, \"Rendering the web version\")", "    html <- file.path(out_dir, paste0(basename_out, \".html\"))", 
+"  }", "  polish_docx(docx)", "", "  out <- list(docx = docx)", 
+"", "  if (\"html\" %in% formats) {", "    say(0.65, \"Rendering the web version\")", 
+"    html <- file.path(out_dir, paste0(basename_out, \".html\"))", 
 "    rmarkdown::render(", "      input = rmd,", "      output_format = rmarkdown::html_document(toc = TRUE, toc_depth = 2),", 
 "      output_file = basename(html),", "      output_dir = out_dir,", 
 "      intermediates_dir = out_dir,", "      knit_root_dir = out_dir,", 
@@ -428,7 +453,7 @@ c("# ---------------------------------------------------------------------------
 "  }", "}", "", "`%||%` <- function(x, y) if (is.null(x)) y else x"
 )
 
-# ==== R/tables.R (421 lines) ====
+# ==== R/tables.R (451 lines) ====
 .embedded[["R/tables.R"]] <-
 c("# ---------------------------------------------------------------------------", 
 "# Table builders. Everything returns a flextable, because the output formats", 
@@ -456,7 +481,22 @@ c("# ---------------------------------------------------------------------------
 "    ft <- flextable::fontsize(ft, size = 8, part = \"footer\")", 
 "    ft <- flextable::italic(ft, part = \"footer\")", "  }", 
 "  ft <- flextable::align(ft, j = 1, align = \"left\", part = \"all\")", 
-"  flextable::autofit(ft)", "}", "", "# --- significance testing ---------------------------------------------------", 
+"  ft <- flextable::autofit(ft)", "", "  # autofit() sizes columns to their content with no page cap, and the wider", 
+"  # summary tables come out at up to twice the printable width -- Word then", 
+"  # clips both edges. Scale the columns down proportionally so every table", 
+"  # fits the 6.5 in text column of a letter page with 1 in margins, keeping", 
+"  # autofit's relative proportions. Scale the widths autofit actually set", 
+"  # (dim), not the dim_pretty estimate: autofit pads each column, so the two", 
+"  # disagree by enough to leave the widest tables still overflowing.", 
+"  # Target a hair under the 6.5 in text column so per-column twip rounding", 
+"  # cannot nudge the grid back over the page edge.", "  page_w <- 6.49", 
+"  min_w  <- 0.7   # narrower columns wrap \"<0.001\" and \"p-value\" mid-token", 
+"  widths <- dim(ft)$widths", "  if (sum(widths) > page_w) {", 
+"    widths <- widths * (page_w / sum(widths))", "    if (min_w * length(widths) < page_w && any(widths < min_w)) {", 
+"      deficit <- sum(pmax(0, min_w - widths))", "      slack   <- pmax(0, widths - min_w)", 
+"      widths  <- pmax(widths, min_w) - deficit * slack / sum(slack)", 
+"    }", "    ft <- flextable::width(ft, width = widths)", "  }", 
+"  ft", "}", "", "# --- significance testing ---------------------------------------------------", 
 "", "#' Chi-square with a Fisher fallback, or Wilcoxon for continuous variables.", 
 "#'", "#' Supplied to gtsummary as a custom test so the report's p-values follow the", 
 "#' original conventions rather than gtsummary's defaults.", 
@@ -501,8 +541,12 @@ c("# ---------------------------------------------------------------------------
 "  )", "", "  tbl <- gtsummary::tbl_summary(", "    d,", "    by = dplyr::all_of(y),", 
 "    type = type_arg,", "    statistic = list(", "      gtsummary::all_continuous()  ~ \"{median} [{p25}, {p75}]; {mean} ({sd})\",", 
 "      gtsummary::all_categorical() ~ \"{n} ({p}%)\"", "    ),", 
-"    digits = list(gtsummary::all_categorical() ~ c(0, 1)),", 
-"    missing = \"no\"", "  )", "  tbl <- gtsummary::add_overall(tbl, last = FALSE)", 
+"    # One decimal throughout, as in the original report: \"17.0 [16.0, 18.0];", 
+"    # 16.8 (1.8)\". gtsummary's adaptive digits produce up to four decimals for", 
+"    # small-scale variables, which both reads badly and widens the cells past", 
+"    # the page.", "    digits = list(", "      gtsummary::all_continuous()  ~ 1,", 
+"      gtsummary::all_categorical() ~ c(0, 1)", "    ),", "    missing = \"no\"", 
+"  )", "  tbl <- gtsummary::add_overall(tbl, last = FALSE)", 
 "  tbl <- gtsummary::add_p(tbl, test = gtsummary::everything() ~ cohort_test,", 
 "                          pvalue_fun = function(x) fmt_p(x))", 
 "  tbl <- gtsummary::modify_header(tbl, label = \"**Variable**\")", 

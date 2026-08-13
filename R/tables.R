@@ -47,7 +47,30 @@ style_table <- function(ft, title = NULL, subtitle = NULL) {
     ft <- flextable::italic(ft, part = "footer")
   }
   ft <- flextable::align(ft, j = 1, align = "left", part = "all")
-  flextable::autofit(ft)
+  ft <- flextable::autofit(ft)
+
+  # autofit() sizes columns to their content with no page cap, and the wider
+  # summary tables come out at up to twice the printable width -- Word then
+  # clips both edges. Scale the columns down proportionally so every table
+  # fits the 6.5 in text column of a letter page with 1 in margins, keeping
+  # autofit's relative proportions. Scale the widths autofit actually set
+  # (dim), not the dim_pretty estimate: autofit pads each column, so the two
+  # disagree by enough to leave the widest tables still overflowing.
+  # Target a hair under the 6.5 in text column so per-column twip rounding
+  # cannot nudge the grid back over the page edge.
+  page_w <- 6.49
+  min_w  <- 0.7   # narrower columns wrap "<0.001" and "p-value" mid-token
+  widths <- dim(ft)$widths
+  if (sum(widths) > page_w) {
+    widths <- widths * (page_w / sum(widths))
+    if (min_w * length(widths) < page_w && any(widths < min_w)) {
+      deficit <- sum(pmax(0, min_w - widths))
+      slack   <- pmax(0, widths - min_w)
+      widths  <- pmax(widths, min_w) - deficit * slack / sum(slack)
+    }
+    ft <- flextable::width(ft, width = widths)
+  }
+  ft
 }
 
 # --- significance testing ---------------------------------------------------
@@ -147,7 +170,14 @@ descriptive_flextable <- function(data, spec, domain, title = NULL) {
       gtsummary::all_continuous()  ~ "{median} [{p25}, {p75}]; {mean} ({sd})",
       gtsummary::all_categorical() ~ "{n} ({p}%)"
     ),
-    digits = list(gtsummary::all_categorical() ~ c(0, 1)),
+    # One decimal throughout, as in the original report: "17.0 [16.0, 18.0];
+    # 16.8 (1.8)". gtsummary's adaptive digits produce up to four decimals for
+    # small-scale variables, which both reads badly and widens the cells past
+    # the page.
+    digits = list(
+      gtsummary::all_continuous()  ~ 1,
+      gtsummary::all_categorical() ~ c(0, 1)
+    ),
     missing = "no"
   )
   tbl <- gtsummary::add_overall(tbl, last = FALSE)
