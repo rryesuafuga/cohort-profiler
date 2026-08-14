@@ -34,6 +34,9 @@ outcome_positive_label <- function(spec) {
 #' Standard theme so every table in the report looks the same in Word.
 style_table <- function(ft, title = NULL, subtitle = NULL) {
   ft <- flextable::theme_booktabs(ft)
+  # Pin the face explicitly: without it the HTML render falls back to the
+  # browser's serif default, so tables came out in Times inside a sans page.
+  ft <- flextable::font(ft, fontname = "Arial", part = "all")
   ft <- flextable::fontsize(ft, size = 9, part = "all")
   ft <- flextable::bold(ft, part = "header")
   ft <- flextable::padding(ft, padding.top = 2, padding.bottom = 2, part = "all")

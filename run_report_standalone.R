@@ -3,7 +3,7 @@
 # run_report_standalone.R -- cohort-profiler report, single self-contained file
 #
 # GENERATED from https://github.com/rryesuafuga/cohort-profiler
-# at commit 832f121 on 2026-08-13 by deploy/make_standalone.R. Do not edit by
+# at commit 4121a77 on 2026-08-14 by deploy/make_standalone.R. Do not edit by
 # hand; regenerate instead.
 #
 # The entire analysis -- validation, data build, tables, report template and
@@ -23,7 +23,7 @@
 # Your data never leaves your machine.
 # ---------------------------------------------------------------------------
 
-message("cohort-profiler standalone report (embedded code, commit 832f121)")
+message("cohort-profiler standalone report (embedded code, commit 4121a77)")
 message("-------------------------------------------------------------")
 
 if (getRversion() < "4.1") {
@@ -227,7 +227,7 @@ c("# ---------------------------------------------------------------------------
 "derive_registry <- function() {", "  list(item_mean = item_mean, asset_pca = asset_pca)", 
 "}")
 
-# ==== R/render.R (297 lines) ====
+# ==== R/render.R (303 lines) ====
 .embedded[["R/render.R"]] <-
 c("# ---------------------------------------------------------------------------", 
 "# Rendering.", "#", "# One render, then convert. The report is knitted to DOCX with pandoc, and the", 
@@ -360,8 +360,11 @@ c("# ---------------------------------------------------------------------------
 "  }", "  polish_docx(docx)", "", "  out <- list(docx = docx)", 
 "", "  if (\"html\" %in% formats) {", "    say(0.65, \"Rendering the web version\")", 
 "    html <- file.path(out_dir, paste0(basename_out, \".html\"))", 
-"    rmarkdown::render(", "      input = rmd,", "      output_format = rmarkdown::html_document(toc = TRUE, toc_depth = 2),", 
-"      output_file = basename(html),", "      output_dir = out_dir,", 
+"    rmarkdown::render(", "      input = rmd,", "      # Styled to read like the original study report: a floating sidebar", 
+"      # contents panel, numbered sections and a Bootstrap theme. All of it", 
+"      # stays inside the single self-contained file.", "      output_format = rmarkdown::html_document(", 
+"        toc = TRUE, toc_depth = 2, toc_float = TRUE,", "        number_sections = TRUE, theme = \"cosmo\"", 
+"      ),", "      output_file = basename(html),", "      output_dir = out_dir,", 
 "      intermediates_dir = out_dir,", "      knit_root_dir = out_dir,", 
 "      params = list(", "        data_file      = data_file,", 
 "        spec_file      = spec_file,", "        r_dir          = r_dir,", 
@@ -453,7 +456,7 @@ c("# ---------------------------------------------------------------------------
 "  }", "}", "", "`%||%` <- function(x, y) if (is.null(x)) y else x"
 )
 
-# ==== R/tables.R (451 lines) ====
+# ==== R/tables.R (454 lines) ====
 .embedded[["R/tables.R"]] <-
 c("# ---------------------------------------------------------------------------", 
 "# Table builders. Everything returns a flextable, because the output formats", 
@@ -473,7 +476,10 @@ c("# ---------------------------------------------------------------------------
 "outcome_positive_label <- function(spec) {", "  lv <- outcome_levels(spec)", 
 "  lv[[length(lv)]]", "}", "", "#' Standard theme so every table in the report looks the same in Word.", 
 "style_table <- function(ft, title = NULL, subtitle = NULL) {", 
-"  ft <- flextable::theme_booktabs(ft)", "  ft <- flextable::fontsize(ft, size = 9, part = \"all\")", 
+"  ft <- flextable::theme_booktabs(ft)", "  # Pin the face explicitly: without it the HTML render falls back to the", 
+"  # browser's serif default, so tables came out in Times inside a sans page.", 
+"  ft <- flextable::font(ft, fontname = \"Arial\", part = \"all\")", 
+"  ft <- flextable::fontsize(ft, size = 9, part = \"all\")", 
 "  ft <- flextable::bold(ft, part = \"header\")", "  ft <- flextable::padding(ft, padding.top = 2, padding.bottom = 2, part = \"all\")", 
 "  if (!is.null(title)) {", "    ft <- flextable::add_header_lines(ft, values = title)", 
 "    ft <- flextable::bold(ft, i = 1, part = \"header\")", "  }", 

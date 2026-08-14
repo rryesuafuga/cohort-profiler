@@ -253,7 +253,13 @@ render_report <- function(data_file,
     html <- file.path(out_dir, paste0(basename_out, ".html"))
     rmarkdown::render(
       input = rmd,
-      output_format = rmarkdown::html_document(toc = TRUE, toc_depth = 2),
+      # Styled to read like the original study report: a floating sidebar
+      # contents panel, numbered sections and a Bootstrap theme. All of it
+      # stays inside the single self-contained file.
+      output_format = rmarkdown::html_document(
+        toc = TRUE, toc_depth = 2, toc_float = TRUE,
+        number_sections = TRUE, theme = "cosmo"
+      ),
       output_file = basename(html),
       output_dir = out_dir,
       intermediates_dir = out_dir,
